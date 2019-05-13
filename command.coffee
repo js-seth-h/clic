@@ -98,11 +98,11 @@ class CliCommand
     cli_opts._ = cli_opts.commands
     setCliOpts cli_opts
 
-  execute: (context)->
+  execute: (context, @parent = null)->
     unless context?
       context = genesisContext()
-    else
-      @parent = context.parent
+    # else
+    #   @parent = context.parent
       # console.log 'process.argv', process.argv
     # @runHooks(context)
     debug 'context =', context
@@ -131,8 +131,8 @@ class CliCommand
     ctx = R.mergeRight R.clone(context),
       host: R.concat context.host, [cmd_name]
       commands: R.tail context.commands
-      parent: this
-    @sub_commands[cmd_name].execute ctx # TODO 자식을 위해서 고쳐야함.
+      # parent: this
+    @sub_commands[cmd_name].execute ctx, this # TODO 자식을 위해서 고쳐야함.
     return true
 
   action: (fn)->
