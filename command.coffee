@@ -2,6 +2,10 @@ path = require 'path'
 debug = require('debug') 'command'
 R = require 'ramda'
 
+CLI_OPTS = {}
+setCliOpts = (opts)-> CLI_OPTS = opts
+getCliOpts = (opts)-> CLI_OPTS
+
 genesisContext = ()->
   debug 'process.argv', process.argv
   # debug 'requre.main', require.main
@@ -47,12 +51,12 @@ getValInOpts = (opts, aliases )->
   # {opts, opt_val: val_str}
   [val_str, opts]
 
-protectFromAccessViolate = (data)->
-  new Proxy data,
-    get: (target, name)->
-      unless R.has "name", target
-        throw new Error "Access vioate on Clic context."
-      return target[name]
+# protectFromAccessViolate = (data)->
+#   new Proxy data,
+#     get: (target, name)->
+#       unless R.has "name", target
+#         throw new Error "Access vioate on Clic context."
+#       return target[name]
 class CliCommand
   constructor: ()->
     @sub_actions = []
@@ -65,6 +69,7 @@ class CliCommand
       commands: []
       examples: []
   printHelp: ()->
+    debug 'print help'
     if @desc?
       console.log "Desc:"
       console.log "  " + @desc
@@ -86,35 +91,49 @@ class CliCommand
     @help_data.examples.push {str, desc}
     return this
 
+  extractOpts: (context)->
+    unless context?
+      context = genesisContext()
+    cli_opts = @parseContext context
+    cli_opts._ = cli_opts.commands
+    setCliOpts cli_opts
 
   execute: (context)->
     unless context?
       context = genesisContext()
+    else
+      @parent = context.parent
       # console.log 'process.argv', process.argv
     # @runHooks(context)
     debug 'context =', context
     @cli_cmd = R.join ' ', context.host
-    if context.commands.length > 0
-      cmd_name = R.head context.commands
-      if @sub_commands[cmd_name]?
-        ctx = R.mergeRight R.clone(context),
-          host: R.concat context.host, [cmd_name]
-          commands: R.tail context.commands
-          parent: this
-        return @sub_commands[cmd_name].execute ctx # TODO 자식을 위해서 고쳐야함.
+    if @runSubCommand context
+      return
 
-    ctx = @parseContext context
-    debug 'parsed context =', ctx
+    cli_opts = @extractOpts context
+    debug 'cli_opts =', cli_opts
     for act in @sub_actions
-      if ctx[act.flag]?
-        debug 'ctx[act.flag]', ctx[act.flag]
-        return act.fn.apply this, [ protectFromAccessViolate ctx] #  act.execute(context)
+      if cli_opts[act.flag]?
+        debug 'cli_opts[act.flag]', cli_opts[act.flag]
+        return act.fn.apply this, [] #  act.execute(context)
     # return @executeDefault context
     if @action_fn?
-      @action_fn.apply this, [protectFromAccessViolate ctx]
+      debug 'run default', @action_fn
+      @action_fn.apply this, []
     else
       console.log 'try --help, -h or command help '
   # executeDefault: ()->
+  runSubCommand: (context)->
+    return false if context.commands.length is 0
+    cmd_name = R.head context.commands
+    return false unless @sub_commands[cmd_name]?
+    debug 'runSubCommand', cmd_name
+    ctx = R.mergeRight R.clone(context),
+      host: R.concat context.host, [cmd_name]
+      commands: R.tail context.commands
+      parent: this
+    @sub_commands[cmd_name].execute ctx # TODO 자식을 위해서 고쳐야함.
+    return true
 
   action: (fn)->
     @action_fn = fn
@@ -133,8 +152,6 @@ class CliCommand
       debug 'context in progress', context
     return context
 
-  # date: ()->
-  #   return this
   string: (flag_fmt, desc, opt = {})->
     {name, aliases, shorts, longs} = getFlagInfo flag_fmt, opt
     debug 'string', name, shorts, longs
@@ -206,18 +223,18 @@ class CliCommand
       short: true
       long: true
       command: true
-      default: true
+      default: false
     aliases = []
     aliases.push '--version' if opt.long
     aliases.push '-v' if opt.short
     printVer = ()-> console.log 'Version: ', version_str
     if aliases.length > 0
       @boolean R.join(', ', aliases), "show version", name: 'version'
-      @subAction 'version', printVer
+      @subAction 'version', -> printVer()
     if opt.command
-      @subCommand 'version', "show version", (new CliCommand()).action printVer
+      @subCommand 'version', "show version", (new CliCommand()).action -> printVer()
     if opt.default
-      @action -> printVer
+      @action -> printVer()
     return this
   help: (opt)->
     opt = R.mergeLeft opt,
@@ -230,11 +247,16 @@ class CliCommand
     aliases.push '-h' if opt.short
     if aliases.length > 0
       @boolean R.join(', ', aliases), "show help", name: 'help'
-      @subAction 'help', (ctx)-> @printHelp()
+      @subAction 'help', ()-> @printHelp()
     if opt.command
-      @subCommand 'help', "show help", (new CliCommand()).action (ctx)-> ctx.parent.printHelp()
+      @subCommand 'help', "show help", (new CliCommand()).action -> @parent.printHelp()
     if opt.default
       @action -> @printHelp()
     return this
 
-module.exports = CliCommand
+
+Object.defineProperties exports,
+  command:
+    value: ()-> new CliCommand()
+  opts:
+    get: ()-> getCliOpts()

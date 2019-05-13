@@ -1,9 +1,8 @@
 debug = require('debug')
-debug.enable("*")
+# debug.enable("*")
 Clic = require './index'
 
-self = new Clic
-self
+self = Clic.command()
   .description "test "
   .number '--count, -c <count>', "set count"
   # .boolean "--version, -v", "print version"
@@ -12,14 +11,19 @@ self
   # .string "-m <modifires>", "use hardware"
   .boolean "--hw", "use hardware"
   .boolean "--violate", "test vaiolate"
-  .subAction 'violate', (ctx)->
-    console.log 'try access undefined input vale'
-    a = ctx.not_exist
-
-  .subCommand 'violate', 'test vioate', (new Clic()).action (ctx)->
-    console.log 'try access undefined input vale'
-    a = ctx.not_exist
+  .subAction 'hw', ()->
+    console.log 'hw=', Clic.opts.hw
+  # .subAction 'violate', ()->
+  #   console.log 'try access undefined input vale'
+  #   a = Clic.opts.not_exist
+  #
+  # .subCommand 'violate', 'test vioate', Clic.command().action ()->
+  #   console.log 'try access undefined input vale'
+  #   a = Clic.opts.not_exist
   # .subCommand 'version', "print version", (new Clic()).action ()-> console.log 'version: 1.0.0'
-  .help default: false, command: false
-  .version '1.0.0', command: false
+  .help default: true, command: false
+  .version '1.0.0', command: true
+
+console.log 'opts=', self.extractOpts()
+
 self.execute()
