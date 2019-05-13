@@ -2,6 +2,8 @@ path = require 'path'
 debug = require('debug') 'command'
 R = require 'ramda'
 
+# indent = require 'indent-string'
+
 CLI_OPTS = {}
 setCliOpts = (opts)-> CLI_OPTS = opts
 getCliOpts = (opts)-> CLI_OPTS
@@ -57,6 +59,12 @@ getValInOpts = (opts, aliases )->
 #       unless R.has "name", target
 #         throw new Error "Access vioate on Clic context."
 #       return target[name]
+
+maxOfProp = (prop_name, data)->
+  fmtLength = R.o R.length, R.prop prop_name
+  lens = R.map fmtLength, data
+  max_len = R.reduce R.max, 0, lens
+
 class CliCommand
   constructor: ()->
     @sub_actions = []
@@ -71,20 +79,29 @@ class CliCommand
   printHelp: ()->
     debug 'print help'
     if @desc?
-      console.log "Desc:"
-      console.log "  " + @desc
+      console.log ''
+      console.log @desc
+      console.log ''
+      # console.log "Desc:"
+      # console.log "  " + @desc
     if not R.isEmpty @help_data.options
       console.log "Options:"
+      pad_size = R.max 20, 2 + maxOfProp 'flag_fmt', @help_data.options
       for item in @help_data.options
-        console.log "  " + item.flag_fmt.padEnd(20) + item.desc
+        console.log "  " + item.flag_fmt.padEnd(pad_size) + item.desc
+      console.log ''
     if not R.isEmpty @help_data.commands
       console.log "Commands:"
+      pad_size = R.max 15, 2 + maxOfProp 'command', @help_data.commands
       for item in @help_data.commands
-        console.log "  " + item.command.padEnd(20) + item.desc
+        console.log "  - " + item.command.padEnd(pad_size) + item.desc
+      console.log ''
     if not R.isEmpty @help_data.examples
       console.log "Examples:"
+      pad_size = R.max 15, 2 + maxOfProp 'str', @help_data.examples
       for item in @help_data.examples
-        console.log "  " + item.str.padEnd(20) + item.desc
+        console.log "  - " + item.str.padEnd(pad_size) + item.desc
+      console.log ''
 
   description: (@desc)-> return this
   example: (str, desc)->

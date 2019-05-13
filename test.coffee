@@ -3,8 +3,11 @@ debug = require('debug')
 Clic = require './index'
 
 self = Clic.command()
-  .description "test "
-  .number '--count, -c <count>', "set count"
+  .description "Cli-Command Example Propgram "
+  .number '--count, -c <count>', "set count."
+  # .number '--long, -l <count>', """long description of flag. this is show examples.
+  #   but not auto breakline. devoloper should be care length
+  #   """
   # .boolean "--version, -v", "print version"
   # .usage '-f'
   # .boolean "--hw", "use hardware"
@@ -24,6 +27,6 @@ self = Clic.command()
   .help default: true, command: false
   .version '1.0.0', command: true
 
-console.log 'opts=', self.extractOpts()
+# console.log 'opts=', self.extractOpts()
 
 self.execute()
