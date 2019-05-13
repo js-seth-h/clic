@@ -1,9 +1,13 @@
 {
   "name": "@jspkg/clic",
   "version": "0.0.1",
-  "main": "index.js",
+  "main": "index",
   "repository": "https://github.com/js-seth-h/clic.git",
   "author": "js <js.seth.h@gmail.com>",
   "license": "MIT",
-  "private": false
+  "private": false,
+  "dependencies": {
+    "debug": "^4.1.1",
+    "ramda": "^0.26.1"
+  }
 }
