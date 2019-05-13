@@ -1,0 +1,9 @@
+{
+  "name": "@jspkg/clic",
+  "version": "0.0.1",
+  "main": "index.js",
+  "repository": "https://github.com/js-seth-h/clic.git",
+  "author": "js <js.seth.h@gmail.com>",
+  "license": "MIT",
+  "private": false
+}
