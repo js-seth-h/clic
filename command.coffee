@@ -2,15 +2,57 @@ path = require 'path'
 debug = require('debug') 'command'
 R = require 'ramda'
 
-getFlagInfo = (flag_fmt, opt)->
-  alias = flag_fmt.match /\-\-?[\w\-]+/g
-  debug 'alias', alias
-  # alias = R.split /[^\w\-]+/, flag_names
-  name = opt?.name or R.replace /^\-+/, '', R.head alias
-  isShort = R.o R.equals(2), R.length
-  [shorts, longs] = R.partition isShort, alias
-  return { name, alias, shorts, longs }
+genesisContext = ()->
+  debug 'process.argv', process.argv
+  # debug 'requre.main', require.main
+  fn = require.main.filename
+  # debug 'fn =', fn, process.argv.findIndex
+  inx = process.argv.indexOf fn
+  debug 'inx ', inx
+  args = process.argv[(inx + 1) ...]
+  inx = R.findIndex R.startsWith('-'), args
+  inx = args.length if inx is -1
+  commands = R.slice 0, inx, args
+  opts = R.slice inx, args.length, args
+  # [opts, commands] = R.partition R.startsWith('-'), opts
 
+  cmd1 = path.basename fn #, path.extname fn
+  context = {
+    host : [cmd1]
+    opts
+    commands
+  }
+  debug 'genesisContext', context
+  return context
+
+
+getFlagInfo = (flag_fmt, opt)->
+  aliases = flag_fmt.match /\-\-?[\w\-]+/g
+  debug 'aliases', aliases
+  # aliases = R.split /[^\w\-]+/, flag_names
+  name = opt?.name or R.replace /^\-+/, '', R.head aliases
+  isShort = R.o R.equals(2), R.length
+  [shorts, longs] = R.partition isShort, aliases
+  return { name, aliases, shorts, longs }
+
+getValInOpts = (opts, aliases )->
+  given = R.intersection aliases, opts
+  return [undefined, opts] if R.isEmpty given
+  if given.length > 1
+    throw new Error 'Duplicated options. ' + JSON.stringify given
+  opt_str = R.head given
+  inx = R.findIndex R.equals(opt_str), opts
+  val_str = R.nth inx + 1, opts
+  opts = R.remove inx, 2, opts
+  # {opts, opt_val: val_str}
+  [val_str, opts]
+
+protectFromAccessViolate = (data)->
+  new Proxy data,
+    get: (target, name)->
+      unless R.has "name", target
+        throw new Error "Access vioate on Clic context."
+      return target[name]
 class CliCommand
   constructor: ()->
     @sub_actions = []
@@ -23,7 +65,6 @@ class CliCommand
       commands: []
       examples: []
   printHelp: ()->
-
     if @desc?
       console.log "Desc:"
       console.log "  " + @desc
@@ -31,7 +72,6 @@ class CliCommand
       console.log "Options:"
       for item in @help_data.options
         console.log "  " + item.flag_fmt.padEnd(20) + item.desc
-
     if not R.isEmpty @help_data.commands
       console.log "Commands:"
       for item in @help_data.commands
@@ -41,8 +81,6 @@ class CliCommand
       for item in @help_data.examples
         console.log "  " + item.str.padEnd(20) + item.desc
 
-  # usage: ()->
-  #   return this
   description: (@desc)-> return this
   example: (str, desc)->
     @help_data.examples.push {str, desc}
@@ -51,25 +89,7 @@ class CliCommand
 
   execute: (context)->
     unless context?
-      debug 'process.argv', process.argv
-      # debug 'requre.main', require.main
-      fn = require.main.filename
-      # debug 'fn =', fn, process.argv.findIndex
-      inx = process.argv.indexOf fn
-      debug 'inx ', inx
-      args = process.argv[(inx + 1) ...]
-      inx = R.findIndex R.startsWith('-'), args
-      commands = R.slice 0, inx, args
-      opts = R.slice inx, args.length, args
-      # [opts, commands] = R.partition R.startsWith('-'), opts
-
-      cmd1 = path.basename fn #, path.extname fn
-      debug 'cmd1=', cmd1, opts
-      context = {
-        host : [cmd1]
-        opts
-        commands
-      }
+      context = genesisContext()
       # console.log 'process.argv', process.argv
     # @runHooks(context)
     debug 'context =', context
@@ -88,10 +108,10 @@ class CliCommand
     for act in @sub_actions
       if ctx[act.flag]?
         debug 'ctx[act.flag]', ctx[act.flag]
-        return act.fn.apply this, [ctx] #  act.execute(context)
+        return act.fn.apply this, [ protectFromAccessViolate ctx] #  act.execute(context)
     # return @executeDefault context
     if @action_fn?
-      @action_fn.apply this, [ctx]
+      @action_fn.apply this, [protectFromAccessViolate ctx]
     else
       console.log 'try --help, -h or command help '
   # executeDefault: ()->
@@ -115,67 +135,61 @@ class CliCommand
 
   # date: ()->
   #   return this
-  anything: ()->
-    return this
-  string: ()->
-    {name, alias, shorts, longs} = getFlagInfo flag_fmt, opt
+  string: (flag_fmt, desc, opt = {})->
+    {name, aliases, shorts, longs} = getFlagInfo flag_fmt, opt
     debug 'string', name, shorts, longs
     @help_data.options.push {flag_fmt, desc}
     @parser.push (ctx)->
-      given = R.intersection alias, ctx.opts
-      return ctx if R.isEmpty given
-      if given.length > 1
-        throw new Error 'Duplicated arguments. ' + JSON.stringify given
-      opt_str = R.head given
-      inx = R.findIndex R.equals(opt_str), ctx.opts
-      val_str = R.nth inx + 1, ctx.opts
-      debug ' as String', inx, val_str
+      [val, opts]= getValInOpts ctx.opts, aliases
+      return ctx unless val
+      debug ' as string', val
       changes =
-        "#{name}": val_str
-        opts: R.remove inx, 2, ctx.opts
+        "#{name}": val
+        opts: opts
       debug 'changes = ', changes
       R.mergeRight ctx, changes
     return this
   number: (flag_fmt, desc, opt = {})->
-    {name, alias, shorts, longs} = getFlagInfo flag_fmt, opt
+    {name, aliases, shorts, longs} = getFlagInfo flag_fmt, opt
     debug 'number', name, shorts, longs
     @help_data.options.push {flag_fmt, desc}
     @parser.push (ctx)->
-      given = R.intersection alias, ctx.opts
-      return ctx if R.isEmpty given
-      if given.length > 1
-        throw new Error 'Duplicated arguments. ' + JSON.stringify given
-      opt_str = R.head given
-      inx = R.findIndex R.equals(opt_str), ctx.opts
-      val_str = R.nth inx + 1, ctx.opts
-      debug ' as Number', inx, val_str
-
+      [val, opts]= getValInOpts ctx.opts, aliases
+      return ctx unless val
+      debug ' as Number', val
       changes =
-        "#{name}": Number val_str
-        opts: R.remove inx, 2, ctx.opts
+        "#{name}": Number val
+        opts: opts
+      debug 'changes = ', changes
+      R.mergeRight ctx, changes
+    return this
+  anything: (flag_fmt, desc, opt = {})->
+    {name, aliases, shorts, longs} = getFlagInfo flag_fmt, opt
+    debug 'string', name, shorts, longs
+    @help_data.options.push {flag_fmt, desc}
+    @parser.push (ctx)->
+      [val, opts]= getValInOpts ctx.opts, aliases
+      return ctx unless val
+      debug ' as string', val
+      changes =
+        "#{name}": opt.convert val
+        opts: opts
       debug 'changes = ', changes
       R.mergeRight ctx, changes
     return this
 
   boolean: (flag_fmt, desc, opt = {})->
-    {name, alias, shorts, longs} = getFlagInfo flag_fmt, opt
-    #
-    # alias = flag_fmt.match /\-\-?[\w\-]+/g
-    # debug 'alias', alias
-    # # alias = R.split /[^\w\-]+/, flag_names
-    # name = opt.name or R.head alias
-    # isShort = R.o R.equals(1), R.length
-    # [shorts, longs] = R.partition isShort, alias
+    {name, aliases, shorts, longs} = getFlagInfo flag_fmt, opt
     debug 'boolean', name, shorts, longs
     @help_data.options.push {flag_fmt, desc}
     @parser.push (ctx)->
       changes =
         "#{name}": opt.default or undefined
 
-      if not R.isEmpty R.intersection alias, ctx.opts
+      if not R.isEmpty R.intersection aliases, ctx.opts
         changes =
           "#{name}": true
-          opts: R.without alias, ctx.opts
+          opts: R.without aliases, ctx.opts
       else
         no_flags = R.map R.concat('--no'), longs
         if not R.isEmpty R.intersection no_flags, ctx.opts
@@ -193,12 +207,12 @@ class CliCommand
       long: true
       command: true
       default: true
-    alias = []
-    alias.push '--version' if opt.long
-    alias.push '-v' if opt.short
+    aliases = []
+    aliases.push '--version' if opt.long
+    aliases.push '-v' if opt.short
     printVer = ()-> console.log 'Version: ', version_str
-    if alias.length > 0
-      @boolean R.join(', ', alias), "show version", name: 'version'
+    if aliases.length > 0
+      @boolean R.join(', ', aliases), "show version", name: 'version'
       @subAction 'version', printVer
     if opt.command
       @subCommand 'version', "show version", (new CliCommand()).action printVer
@@ -211,11 +225,11 @@ class CliCommand
       long: true
       command: true
       default: true
-    alias = []
-    alias.push '--help' if opt.long
-    alias.push '-h' if opt.short
-    if alias.length > 0
-      @boolean R.join(', ', alias), "show help", name: 'help'
+    aliases = []
+    aliases.push '--help' if opt.long
+    aliases.push '-h' if opt.short
+    if aliases.length > 0
+      @boolean R.join(', ', aliases), "show help", name: 'help'
       @subAction 'help', (ctx)-> @printHelp()
     if opt.command
       @subCommand 'help', "show help", (new CliCommand()).action (ctx)-> ctx.parent.printHelp()
