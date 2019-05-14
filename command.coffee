@@ -160,7 +160,7 @@ class CliCommand
     context.input = {}
     for extract_fn in @extractors
       extract_fn context
-      debug 'context in progress', context
+      # debug 'context in progress', context
     # cli_opts = @parseContext context
     # context._ = context.commands
     setCliOpts R.mergeRight context.input,
@@ -200,11 +200,12 @@ class CliCommand
     cmd_name = R.head context.commands
     return null unless @sub_commands[cmd_name]?
     debug 'runSubCommand', cmd_name
-    ctx = R.mergeRight R.clone(context),
+    ctx = R.mergeRight context,
       host: R.concat context.host, [cmd_name]
       commands: R.tail context.commands
       # parent: this
-    return @sub_commands[cmd_name].execute ctx, this # TODO 자식을 위해서 고쳐야함.
+    return do ()=>
+      await @sub_commands[cmd_name].execute ctx, this # TODO 자식을 위해서 고쳐야함.
 
   action: (fn)->
     @action_fn = fn
@@ -212,17 +213,31 @@ class CliCommand
   actionWith: (flag, fn)->
     @alt_actions[flag] = {fn}
     return this
-  command: (str, desc, fn )->
-    @commands[str] = {fn}
+  command: (str, desc = '', fn_or_sub )->
+    if R.is Function, fn_or_sub
+      @commands[str] = {fn: fn_or_sub}
+    else
+      @sub_commands[str] = fn_or_sub
     @setHelpCommand str, desc
     return this
-  subCommand: (str, desc, sub_cmd )->
-    @sub_commands[str] = sub_cmd
-    # @help_data.commands.push {command: str, desc}
-    @setHelpCommand str, desc
+  # subCommand: (str, desc, sub_cmd )->
+  #   @sub_commands[str] = sub_cmd
+  #   # @help_data.commands.push {command: str, desc}
+  #   @setHelpCommand str, desc
+  #   return this
+  array: (flag_fmt, desc = '', opt = {})->
+    {name, aliases, shorts, longs} = getFlagInfo flag_fmt, opt
+    debug 'string', name, shorts, longs
+    # @help_data.options.push {flag_fmt, desc}
+    @setHelpFlag flag_fmt, desc
+    @extractors.push (ctx)->
+      [alias, vals] = ctx.opt_info.getValues aliases
+      unless alias?
+        ctx.input[name] = []
+      else
+        ctx.input[name] = vals
     return this
-
-  string: (flag_fmt, desc, opt = {})->
+  string: (flag_fmt, desc = '', opt = {})->
     {name, aliases, shorts, longs} = getFlagInfo flag_fmt, opt
     debug 'string', name, shorts, longs
     # @help_data.options.push {flag_fmt, desc}
@@ -234,7 +249,7 @@ class CliCommand
         throw new Error 'require only single string; ' + withDash alias
       ctx.input[name] = vals[0]
     return this
-  number: (flag_fmt, desc, opt = {})->
+  number: (flag_fmt, desc = '', opt = {})->
     {name, aliases, shorts, longs} = getFlagInfo flag_fmt, opt
     debug 'number', name, shorts, longs
     # @help_data.options.push {flag_fmt, desc}
@@ -249,7 +264,7 @@ class CliCommand
         throw new Error 'can not parse number; ' + vals[0]
       ctx.input[name] = num
     return this
-  custom: (flag_fmt, desc, opt = {})->
+  custom: (flag_fmt, desc = '', opt = {})->
     {name, aliases, shorts, longs} = getFlagInfo flag_fmt, opt
     debug 'string', name, shorts, longs
     # @help_data.options.push {flag_fmt, desc}
@@ -260,7 +275,7 @@ class CliCommand
       ctx.input[name] = opt.convert vals, alias
     return this
 
-  boolean: (flag_fmt, desc, opt = {})->
+  boolean: (flag_fmt, desc = '', opt = {})->
     {name, aliases, shorts, longs} = getFlagInfo flag_fmt, opt
     debug 'boolean', name, shorts, longs
     # @help_data.options.push {flag_fmt, desc}
@@ -294,7 +309,7 @@ class CliCommand
       @boolean R.join(', ', aliases), "show version", name: 'version'
       @actionWith 'version', -> printVer()
     if opt.command
-      @subCommand 'version', "show version", (new CliCommand()).action -> printVer()
+      @command 'version', "show version", -> printVer()
     if opt.default
       @action -> printVer()
     return this
@@ -311,7 +326,7 @@ class CliCommand
       @boolean R.join(', ', aliases), "show help", name: 'help'
       @actionWith 'help', ()-> @printHelp()
     if opt.command
-      @subCommand 'help', "show help", (new CliCommand()).action -> @parent.printHelp()
+      @command 'help', "show help", -> @printHelp()
     if opt.default
       @action -> @printHelp()
     return this

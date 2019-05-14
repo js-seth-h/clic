@@ -3,6 +3,14 @@ debug = require('debug')
 # debug.enable("*")
 Clic = require './index'
 
+sub = Clic.command()
+  .help command: false
+  .array '--mod <str> ... <str>', 'mods'
+  .version '9.9.9', default: true
+  .boolean '-z'
+  .actionWith 'z', ()->
+    console.log 'print=', Clic.opts
+
 self = Clic.command()
   .description "Cli-Command Example Propgram "
   # .array '--mod str ... str', 'mods'
@@ -24,7 +32,7 @@ self = Clic.command()
     console.log 'hw=', Clic.opts.hw
   .command 'print', 'print Clic.opts', ()->
     console.log 'print=', Clic.opts
-
+  .command 'sub', 'sub', sub
   # .subAction 'violate', ()->
   #   console.log 'try access undefined input vale'
   #   a = Clic.opts.not_exist
