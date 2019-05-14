@@ -67,7 +67,7 @@ maxOfProp = (prop_name, data)->
 
 class CliCommand
   constructor: ()->
-    @sub_actions = []
+    @sub_actions = {}
     @sub_commands = {}
     @parser = []
     # @opts = []
@@ -76,7 +76,9 @@ class CliCommand
       options: []
       commands: []
       examples: []
+
   printHelp: ()->
+    await @help_data.hook() if @help_data.hook?
     debug 'print help'
     if @desc?
       console.log ''
@@ -103,11 +105,20 @@ class CliCommand
         console.log "  - " + item.str.padEnd(pad_size) + item.desc
       console.log ''
 
-  description: (@desc)-> return this
+  description: (@desc)->
+    return this
+  helpHook: (fn)->
+    @help_data.hook = fn
+    return this
   example: (str, desc)->
     @help_data.examples.push {str, desc}
     return this
-
+  setHelpCommand: (command, desc)->
+    @help_data.commands.push {command, desc}
+    return this
+  setHelpFlag: (flag_fmt, desc)->
+    @help_data.options.push {flag_fmt, desc}
+    return this
   extractOpts: (context)->
     unless context?
       context = genesisContext()
@@ -129,9 +140,9 @@ class CliCommand
 
     cli_opts = @extractOpts context
     debug 'cli_opts =', cli_opts
-    for act in @sub_actions
-      if cli_opts[act.flag]?
-        debug 'cli_opts[act.flag]', cli_opts[act.flag]
+    for own flag, act of @sub_actions
+      if cli_opts[flag]?
+        debug 'cli_opts[flag]', cli_opts[flag]
         return act.fn.apply this, [] #  act.execute(context)
     # return @executeDefault context
     if @action_fn?
@@ -156,11 +167,12 @@ class CliCommand
     @action_fn = fn
     return this
   subAction: (flag, fn)->
-    @sub_actions.push {flag, fn}
+    @sub_actions[flag] = { fn}
     return this
   subCommand: (str, desc, sub_cmd )->
     @sub_commands[str] = sub_cmd
-    @help_data.commands.push {command: str, desc}
+    # @help_data.commands.push {command: str, desc}
+    @setHelpFlag str, desc
     return this
 
   parseContext: (context)->
@@ -172,7 +184,8 @@ class CliCommand
   string: (flag_fmt, desc, opt = {})->
     {name, aliases, shorts, longs} = getFlagInfo flag_fmt, opt
     debug 'string', name, shorts, longs
-    @help_data.options.push {flag_fmt, desc}
+    # @help_data.options.push {flag_fmt, desc}
+    @setHelpFlag flag_fmt, desc
     @parser.push (ctx)->
       [val, opts]= getValInOpts ctx.opts, aliases
       return ctx unless val
@@ -186,7 +199,8 @@ class CliCommand
   number: (flag_fmt, desc, opt = {})->
     {name, aliases, shorts, longs} = getFlagInfo flag_fmt, opt
     debug 'number', name, shorts, longs
-    @help_data.options.push {flag_fmt, desc}
+    # @help_data.options.push {flag_fmt, desc}
+    @setHelpFlag flag_fmt, desc
     @parser.push (ctx)->
       [val, opts]= getValInOpts ctx.opts, aliases
       return ctx unless val
@@ -200,7 +214,8 @@ class CliCommand
   anything: (flag_fmt, desc, opt = {})->
     {name, aliases, shorts, longs} = getFlagInfo flag_fmt, opt
     debug 'string', name, shorts, longs
-    @help_data.options.push {flag_fmt, desc}
+    # @help_data.options.push {flag_fmt, desc}
+    @setHelpFlag flag_fmt, desc
     @parser.push (ctx)->
       [val, opts]= getValInOpts ctx.opts, aliases
       return ctx unless val
@@ -215,7 +230,8 @@ class CliCommand
   boolean: (flag_fmt, desc, opt = {})->
     {name, aliases, shorts, longs} = getFlagInfo flag_fmt, opt
     debug 'boolean', name, shorts, longs
-    @help_data.options.push {flag_fmt, desc}
+    # @help_data.options.push {flag_fmt, desc}
+    @setHelpFlag flag_fmt, desc
     @parser.push (ctx)->
       changes =
         "#{name}": opt.default or undefined
@@ -232,7 +248,6 @@ class CliCommand
             opts: R.without no_flags, ctx.opts
       debug 'changes = ', changes
       R.mergeRight ctx, changes
-
     return this
 
   version: (version_str, opt)->
