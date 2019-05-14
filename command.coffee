@@ -7,7 +7,37 @@ R = require 'ramda'
 CLI_OPTS = {}
 setCliOpts = (opts)-> CLI_OPTS = opts
 getCliOpts = (opts)-> CLI_OPTS
+withDash = (str)->
+  if 1 is R.length str
+    return "-" + str
+  else
+    return "--" + str
+class OptInfo
+  constructor: ()->
+    @data = {}
+  setKey: (key)->
+    @endOpt()
+    @last_key = key
+    @last_val = []
+  pushValue: (val)->
+    @last_val.push val
+  end: ()->
+    @endOpt()
+  endOpt: ()->
+    # if R.isEmpty @last_val
+    #   @last_val.push true
+    @data[@last_key] = @last_val
 
+  getValues: (aliases)->
+    exists = R.map R.has(R.__, @data), aliases
+    in_count = R.length R.filter R.equals(true), exists
+    if in_count > 1
+      throw new Error 'dont mix aliases'
+    for alias in aliases
+      continue unless @data[alias]?
+      return [alias, @data[alias]]
+    return [null, null]
+    
 genesisContext = ()->
   debug 'process.argv', process.argv
   # debug 'requre.main', require.main
@@ -20,12 +50,27 @@ genesisContext = ()->
   inx = args.length if inx is -1
   commands = R.slice 0, inx, args
   opts = R.slice inx, args.length, args
+
+  parser = new OptInfo()
+  for tok in opts
+    console.log tok
+    if R.startsWith '--no-', tok
+      parser.setKey tok[5...]
+      parser.pushValue false
+    if R.startsWith '--', tok
+      parser.setKey tok[2...]
+    else if R.startsWith '-', tok
+      for ch in tok[1...]
+        parser.setKey ch
+    else
+      parser.pushValue tok
+  parser.end()
   # [opts, commands] = R.partition R.startsWith('-'), opts
 
   cmd1 = path.basename fn #, path.extname fn
   context = {
     host : [cmd1]
-    opts
+    opt_info: parser
     commands
   }
   debug 'genesisContext', context
@@ -36,29 +81,12 @@ getFlagInfo = (flag_fmt, opt)->
   aliases = flag_fmt.match /\-\-?[\w\-]+/g
   debug 'aliases', aliases
   # aliases = R.split /[^\w\-]+/, flag_names
-  name = opt?.name or R.replace /^\-+/, '', R.head aliases
+  removeDash = R.replace /^\-+/, ''
+  aliases = R.map removeDash, aliases
+  name = opt?.name or R.head aliases
   isShort = R.o R.equals(2), R.length
   [shorts, longs] = R.partition isShort, aliases
   return { name, aliases, shorts, longs }
-
-getValInOpts = (opts, aliases )->
-  given = R.intersection aliases, opts
-  return [undefined, opts] if R.isEmpty given
-  if given.length > 1
-    throw new Error 'Duplicated options. ' + JSON.stringify given
-  opt_str = R.head given
-  inx = R.findIndex R.equals(opt_str), opts
-  val_str = R.nth inx + 1, opts
-  opts = R.remove inx, 2, opts
-  # {opts, opt_val: val_str}
-  [val_str, opts]
-
-# protectFromAccessViolate = (data)->
-#   new Proxy data,
-#     get: (target, name)->
-#       unless R.has "name", target
-#         throw new Error "Access vioate on Clic context."
-#       return target[name]
 
 maxOfProp = (prop_name, data)->
   fmtLength = R.o R.length, R.prop prop_name
@@ -69,7 +97,7 @@ class CliCommand
   constructor: ()->
     @sub_actions = {}
     @sub_commands = {}
-    @parser = []
+    @extractors = []
     # @opts = []
     @desc = null
     @help_data =
@@ -124,10 +152,15 @@ class CliCommand
   extractOpts: (context)->
     unless context?
       context = genesisContext()
-    cli_opts = @parseContext context
-    cli_opts._ = cli_opts.commands
-    setCliOpts cli_opts
 
+    context.input = {}
+    for extract_fn in @extractors
+      extract_fn context
+      debug 'context in progress', context
+    # cli_opts = @parseContext context
+    # context._ = context.commands
+    setCliOpts R.mergeRight context.input,
+      _: context.commands
   execute: (context, @parent = null)->
     unless context?
       context = genesisContext()
@@ -174,59 +207,45 @@ class CliCommand
   subCommand: (str, desc, sub_cmd )->
     @sub_commands[str] = sub_cmd
     # @help_data.commands.push {command: str, desc}
-    @setHelpFlag str, desc
+    @setHelpCommand str, desc
     return this
-
-  parseContext: (context)->
-    for parse in @parser
-      context = parse context
-      debug 'context in progress', context
-    return context
 
   string: (flag_fmt, desc, opt = {})->
     {name, aliases, shorts, longs} = getFlagInfo flag_fmt, opt
     debug 'string', name, shorts, longs
     # @help_data.options.push {flag_fmt, desc}
     @setHelpFlag flag_fmt, desc
-    @parser.push (ctx)->
-      [val, opts]= getValInOpts ctx.opts, aliases
-      return ctx unless val
-      debug ' as string', val
-      changes =
-        "#{name}": val
-        opts: opts
-      debug 'changes = ', changes
-      R.mergeRight ctx, changes
+    @extractors.push (ctx)->
+      [alias, vals] = ctx.opt_info.getValues aliases
+      return ctx unless alias?
+      if vals.length isnt 1
+        throw new Error 'require only single string; ' + withDash alias
+      ctx.input[name] = vals[0]
     return this
   number: (flag_fmt, desc, opt = {})->
     {name, aliases, shorts, longs} = getFlagInfo flag_fmt, opt
     debug 'number', name, shorts, longs
     # @help_data.options.push {flag_fmt, desc}
     @setHelpFlag flag_fmt, desc
-    @parser.push (ctx)->
-      [val, opts]= getValInOpts ctx.opts, aliases
-      return ctx unless val
-      debug ' as Number', val
-      changes =
-        "#{name}": Number val
-        opts: opts
-      debug 'changes = ', changes
-      R.mergeRight ctx, changes
+    @extractors.push (ctx)->
+      [alias, vals] = ctx.opt_info.getValues aliases
+      return ctx unless alias?
+      if vals.length isnt 1
+        throw new Error 'require only single number; ' + withDash alias
+      num =  Number vals[0]
+      if Number.isNaN num
+        throw new Error 'can not parse number; ' + vals[0]
+      ctx.input[name] = num
     return this
-  anything: (flag_fmt, desc, opt = {})->
+  custom: (flag_fmt, desc, opt = {})->
     {name, aliases, shorts, longs} = getFlagInfo flag_fmt, opt
     debug 'string', name, shorts, longs
     # @help_data.options.push {flag_fmt, desc}
     @setHelpFlag flag_fmt, desc
-    @parser.push (ctx)->
-      [val, opts]= getValInOpts ctx.opts, aliases
-      return ctx unless val
-      debug ' as string', val
-      changes =
-        "#{name}": opt.convert val
-        opts: opts
-      debug 'changes = ', changes
-      R.mergeRight ctx, changes
+    @extractors.push (ctx)->
+      [alias, vals] = ctx.opt_info.getValues aliases
+      return ctx unless alias?
+      ctx.input[name] = opt.convert vals, alias
     return this
 
   boolean: (flag_fmt, desc, opt = {})->
@@ -234,22 +253,19 @@ class CliCommand
     debug 'boolean', name, shorts, longs
     # @help_data.options.push {flag_fmt, desc}
     @setHelpFlag flag_fmt, desc
-    @parser.push (ctx)->
-      changes =
-        "#{name}": opt.default or undefined
-
-      if not R.isEmpty R.intersection aliases, ctx.opts
-        changes =
-          "#{name}": true
-          opts: R.without aliases, ctx.opts
-      else
-        no_flags = R.map R.concat('--no'), longs
-        if not R.isEmpty R.intersection no_flags, ctx.opts
-          changes =
-            "#{name}": false
-            opts: R.without no_flags, ctx.opts
-      debug 'changes = ', changes
-      R.mergeRight ctx, changes
+    @extractors.push (ctx)->
+      [alias, vals] = ctx.opt_info.getValues aliases
+      unless alias?
+        ctx.input[name] = opt.default
+        return
+      if vals.length is 0
+        ctx.input[name] = true
+        return
+      if vals[0] is false
+        ctx.input[name] = false
+        return
+      debug 'boolean', alias, vals
+      throw new Error 'require only on/off; ' + withDash alias
     return this
 
   version: (version_str, opt)->
