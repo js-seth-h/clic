@@ -37,7 +37,7 @@ class OptInfo
       continue unless @data[alias]?
       return [alias, @data[alias]]
     return [null, null]
-    
+
 genesisContext = ()->
   debug 'process.argv', process.argv
   # debug 'requre.main', require.main
@@ -53,7 +53,6 @@ genesisContext = ()->
 
   parser = new OptInfo()
   for tok in opts
-    console.log tok
     if R.startsWith '--no-', tok
       parser.setKey tok[5...]
       parser.pushValue false
@@ -67,7 +66,7 @@ genesisContext = ()->
   parser.end()
   # [opts, commands] = R.partition R.startsWith('-'), opts
 
-  cmd1 = path.basename fn #, path.extname fn
+  cmd1 = path.basename fn#, path.extname fn
   context = {
     host : [cmd1]
     opt_info: parser
@@ -95,7 +94,8 @@ maxOfProp = (prop_name, data)->
 
 class CliCommand
   constructor: ()->
-    @sub_actions = {}
+    @alt_actions = {}
+    @commands = {}
     @sub_commands = {}
     @extractors = []
     # @opts = []
@@ -110,8 +110,12 @@ class CliCommand
       await @help_data.hook.apply this, []
       # await @help_data.hook()
     debug 'print help'
+
+    console.log 'Usage:', @cli_cmd
+    console.log ''
+
+
     if @desc?
-      console.log ''
       console.log @desc
       console.log ''
       # console.log "Desc:"
@@ -170,39 +174,47 @@ class CliCommand
     # @runHooks(context)
     debug 'context =', context
     @cli_cmd = R.join ' ', context.host
-    if @runSubCommand context
-      return
+    task_promise = @runSubCommand context
+    return task_promise if task_promise?
 
     cli_opts = @extractOpts context
     debug 'cli_opts =', cli_opts
-    for own flag, act of @sub_actions
-      if cli_opts[flag]?
-        debug 'cli_opts[flag]', cli_opts[flag]
-        return act.fn.apply this, [] #  act.execute(context)
-    # return @executeDefault context
+    for own flag, act of @alt_actions
+      continue unless cli_opts[flag]?
+      debug 'cli_opts[flag]', cli_opts[flag]
+      return act.fn.apply this, [] #  act.execute(context)
+
+    # for own flag, act of @commands
+    cmd_name = R.head context.commands
+    if cmd_name? and @commands[cmd_name]?
+      return @commands[cmd_name].fn.apply this, []
+
     if @action_fn?
       debug 'run default', @action_fn
-      @action_fn.apply this, []
-    else
-      console.log 'try --help, -h or command help '
+      return @action_fn.apply this, []
+
+    console.log 'try --help, -h or command help '
   # executeDefault: ()->
   runSubCommand: (context)->
-    return false if context.commands.length is 0
+    return null if context.commands.length is 0
     cmd_name = R.head context.commands
-    return false unless @sub_commands[cmd_name]?
+    return null unless @sub_commands[cmd_name]?
     debug 'runSubCommand', cmd_name
     ctx = R.mergeRight R.clone(context),
       host: R.concat context.host, [cmd_name]
       commands: R.tail context.commands
       # parent: this
-    @sub_commands[cmd_name].execute ctx, this # TODO 자식을 위해서 고쳐야함.
-    return true
+    return @sub_commands[cmd_name].execute ctx, this # TODO 자식을 위해서 고쳐야함.
 
   action: (fn)->
     @action_fn = fn
     return this
-  subAction: (flag, fn)->
-    @sub_actions[flag] = { fn}
+  actionWith: (flag, fn)->
+    @alt_actions[flag] = {fn}
+    return this
+  command: (str, desc, fn )->
+    @commands[str] = {fn}
+    @setHelpCommand str, desc
     return this
   subCommand: (str, desc, sub_cmd )->
     @sub_commands[str] = sub_cmd
@@ -280,7 +292,7 @@ class CliCommand
     printVer = ()-> console.log 'Version: ', version_str
     if aliases.length > 0
       @boolean R.join(', ', aliases), "show version", name: 'version'
-      @subAction 'version', -> printVer()
+      @actionWith 'version', -> printVer()
     if opt.command
       @subCommand 'version', "show version", (new CliCommand()).action -> printVer()
     if opt.default
@@ -297,7 +309,7 @@ class CliCommand
     aliases.push '-h' if opt.short
     if aliases.length > 0
       @boolean R.join(', ', aliases), "show help", name: 'help'
-      @subAction 'help', ()-> @printHelp()
+      @actionWith 'help', ()-> @printHelp()
     if opt.command
       @subCommand 'help', "show help", (new CliCommand()).action -> @parent.printHelp()
     if opt.default

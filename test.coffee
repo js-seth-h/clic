@@ -1,5 +1,6 @@
+
 debug = require('debug')
-debug.enable("*")
+# debug.enable("*")
 Clic = require './index'
 
 self = Clic.command()
@@ -19,8 +20,11 @@ self = Clic.command()
   .boolean "--hw", "use hardware"
   .boolean "--pass", "use pass"
   .boolean "--violate", "test vaiolate"
-  .subAction 'hw', ()->
+  .actionWith 'hw', ()->
     console.log 'hw=', Clic.opts.hw
+  .command 'print', 'print Clic.opts', ()->
+    console.log 'print=', Clic.opts
+
   # .subAction 'violate', ()->
   #   console.log 'try access undefined input vale'
   #   a = Clic.opts.not_exist
@@ -35,4 +39,4 @@ self = Clic.command()
 # console.log 'opts=', self.extractOpts()
 
 self.execute()
-console.log 'Clic.opts =', Clic.opts
+# console.log 'Clic.opts =', Clic.opts
