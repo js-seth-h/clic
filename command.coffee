@@ -78,7 +78,9 @@ class CliCommand
       examples: []
 
   printHelp: ()->
-    await @help_data.hook() if @help_data.hook?
+    if @help_data.hook?
+      await @help_data.hook.apply this, []
+      # await @help_data.hook()
     debug 'print help'
     if @desc?
       console.log ''
