@@ -8,7 +8,7 @@ sub = Clic.command()
   .array '--mod <str> ... <str>', 'mods'
   .version '9.9.9', default: true
   .boolean '-z'
-  .actionWith 'z', ()->
+  .actionAlt 'z', ()->
     console.log 'print=', Clic.opts
 
 self = Clic.command()
@@ -28,7 +28,7 @@ self = Clic.command()
   .boolean "--hw", "use hardware"
   .boolean "--pass", "use pass"
   .boolean "--violate", "test vaiolate"
-  .actionWith 'hw', ()->
+  .actionAlt 'hw', ()->
     console.log 'hw=', Clic.opts.hw
   .command 'print', 'print Clic.opts', ()->
     console.log 'print=', Clic.opts

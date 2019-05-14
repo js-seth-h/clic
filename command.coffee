@@ -210,10 +210,14 @@ class CliCommand
   action: (fn)->
     @action_fn = fn
     return this
-  actionWith: (flag, fn)->
+  actionAlt: (flag, fn)->
     @alt_actions[flag] = {fn}
     return this
-  command: (str, desc = '', fn_or_sub )->
+  command: (args... )->
+    desc = ''
+    [str, fn_or_sub] = args if args.length is 2
+    [str, desc, fn_or_sub] = args if args.length is 3
+
     if R.is Function, fn_or_sub
       @commands[str] = {fn: fn_or_sub}
     else
@@ -307,7 +311,7 @@ class CliCommand
     printVer = ()-> console.log 'Version: ', version_str
     if aliases.length > 0
       @boolean R.join(', ', aliases), "show version", name: 'version'
-      @actionWith 'version', -> printVer()
+      @actionAlt 'version', -> printVer()
     if opt.command
       @command 'version', "show version", -> printVer()
     if opt.default
@@ -324,7 +328,7 @@ class CliCommand
     aliases.push '-h' if opt.short
     if aliases.length > 0
       @boolean R.join(', ', aliases), "show help", name: 'help'
-      @actionWith 'help', ()-> @printHelp()
+      @actionAlt 'help', ()-> @printHelp()
     if opt.command
       @command 'help', "show help", -> @printHelp()
     if opt.default
