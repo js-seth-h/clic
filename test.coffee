@@ -47,4 +47,5 @@ self = Clic.command()
 # console.log 'opts=', self.extractOpts()
 
 self.execute()
-# console.log 'Clic.opts =', Clic.opts
+console.log 'Clic.opts =', Clic.opts
+console.log 'Clic.raw =', Clic.raw

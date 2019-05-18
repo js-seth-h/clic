@@ -6,7 +6,14 @@ R = require 'ramda'
 
 CLI_OPTS = {}
 setCliOpts = (opts)-> CLI_OPTS = opts
-getCliOpts = (opts)-> CLI_OPTS
+getCliOpts = -> CLI_OPTS
+
+RAW_CMDS = []
+RAW_OPTS = []
+getCliRaw = ->
+  cmds: RAW_CMDS
+  opts: RAW_OPTS
+
 withDash = (str)->
   if 1 is R.length str
     return "-" + str
@@ -48,8 +55,11 @@ genesisContext = ()->
   args = process.argv[(inx + 1) ...]
   inx = R.findIndex R.startsWith('-'), args
   inx = args.length if inx is -1
+
   commands = R.slice 0, inx, args
   opts = R.slice inx, args.length, args
+  RAW_CMDS = commands
+  RAW_OPTS = opts
 
   parser = new OptInfo()
   for tok in opts
@@ -341,3 +351,5 @@ Object.defineProperties exports,
     value: ()-> new CliCommand()
   opts:
     get: ()-> getCliOpts()
+  raw:
+    get: ()-> getCliRaw()
