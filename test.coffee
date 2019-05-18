@@ -41,11 +41,13 @@ self = Clic.command()
   #   console.log 'try access undefined input vale'
   #   a = Clic.opts.not_exist
   # .subCommand 'version', "print version", (new Clic()).action ()-> console.log 'version: 1.0.0'
+  .command 'shell', ->
+    Clic.runSh "coffee test2.coffee", pass_opt: 'env'
   .help default: true, command: false
   .version '1.0.0', command: true
 
 # console.log 'opts=', self.extractOpts()
 
 self.execute()
-console.log 'Clic.opts =', Clic.opts
-console.log 'Clic.raw =', Clic.raw
+# console.log 'Clic.opts =', Clic.opts
+# console.log 'Clic.raw =', Clic.raw

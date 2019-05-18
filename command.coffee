@@ -347,9 +347,30 @@ class CliCommand
 
 
 Object.defineProperties exports,
-  command:
-    value: ()-> new CliCommand()
   opts:
     get: ()-> getCliOpts()
   raw:
     get: ()-> getCliRaw()
+
+Object.assign exports,
+  command: ()-> new CliCommand()
+  restoreFormEnv: ->
+    if process.env.clic_opt_str?
+      setCliOpts JSON.parse process.env.clic_opt_str
+  runSh: (cmd, opt)->
+    # console.log 'run', cmd
+    options =
+      stdio: 'inherit'
+    if opt.pass_opt is 'env'
+      options.env = Object.assign process.env,
+        clic_opt_str: JSON.stringify getCliOpts()
+    if process.platform is "win32"
+      command = "cmd.exe"
+      args = ["/s", "/c", cmd]
+      options.windowsVerbatimArguments = true
+    else
+      command = "/bin/sh"
+      args = [ "-c", cmd ]
+    child_process = require 'child_process'
+    console.log 'child_process.spawn', command, args, options
+    proc = child_process.spawn command, args, options
