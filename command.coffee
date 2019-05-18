@@ -372,5 +372,5 @@ Object.assign exports,
       command = "/bin/sh"
       args = [ "-c", cmd ]
     child_process = require 'child_process'
-    console.log 'child_process.spawn', command, args, options
+    # console.log 'child_process.spawn', command, args, options
     proc = child_process.spawn command, args, options
