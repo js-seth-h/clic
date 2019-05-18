@@ -354,7 +354,7 @@ Object.defineProperties exports,
 
 Object.assign exports,
   command: ()-> new CliCommand()
-  restoreFormEnv: ->
+  restoreFromEnv: ->
     if process.env.clic_opt_str?
       setCliOpts JSON.parse process.env.clic_opt_str
   runSh: (cmd, opt)->
