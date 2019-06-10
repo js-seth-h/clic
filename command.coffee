@@ -110,24 +110,32 @@ class CliCommand
     @extractors = []
     # @opts = []
     @desc = null
+    @usage_prop = ''
     @help_data =
       options: []
       commands: []
       examples: []
 
   printHelp: ()->
-    if @help_data.hook?
-      await @help_data.hook.apply this, []
+    if @help_data.hook_pre?
+      await @help_data.hook_pre.apply this, []
       # await @help_data.hook()
     debug 'print help'
-
-    console.log 'Usage:', @cli_cmd
-    console.log ''
-
 
     if @desc?
       console.log @desc
       console.log ''
+
+    # console.log 'cli command:', @cli_cmd
+    # console.log ''
+
+    console.log 'Usage: '
+    if R.is Function, @usage_prop
+      @usage_prop()
+    else
+      console.log '  ' + @cli_cmd + ' ' + @usage_prop
+    console.log ''
+
       # console.log "Desc:"
       # console.log "  " + @desc
     if not R.isEmpty @help_data.options
@@ -149,10 +157,21 @@ class CliCommand
         console.log "  - " + item.str.padEnd(pad_size) + item.desc
       console.log ''
 
+    if @help_data.hook_post?
+      await @help_data.hook_post.apply this, []
+
   description: (@desc)->
     return this
   helpHook: (fn)->
-    @help_data.hook = fn
+    @help_data.hook_pre = fn
+    return this
+  onPreHelp: (fn)->
+    @help_data.hook_pre = fn
+    return this
+  onPostHelp: (fn)->
+    @help_data.hook_post = fn
+    return this
+  usage: (@usage_prop)->
     return this
   example: (str, desc)->
     @help_data.examples.push {str, desc}

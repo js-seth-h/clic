@@ -12,6 +12,9 @@ sub = Clic.command()
     console.log 'print=', Clic.opts
 
 self = Clic.command()
+  # .usage "groups... -g greps..."
+  .usage ->
+    console.log "  #{@cli_cmd} groups... -g greps.."
   .description "Cli-Command Example Propgram "
   # .array '--mod str ... str', 'mods'
   .string '--str, -s <str>', 'string'
@@ -33,6 +36,11 @@ self = Clic.command()
   .command 'print', 'print Clic.opts', ()->
     console.log 'print=', Clic.opts
   .command 'sub', 'sub', sub
+  .onPostHelp ->
+    console.log 'Groups:'
+    console.log '   asdfasdf'
+    console.log ''
+
   # .subAction 'violate', ()->
   #   console.log 'try access undefined input vale'
   #   a = Clic.opts.not_exist
