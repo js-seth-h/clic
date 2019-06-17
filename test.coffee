@@ -32,7 +32,7 @@ self = Clic.command()
   .boolean "--pass", "use pass"
   .boolean "--violate", "test vaiolate"
   .actionAlt 'hw', ()->
-    console.log 'hw=', Clic.opts.hw
+    console.log 'hw=', Clic.opts.HW
   .command 'print', 'print Clic.opts', ()->
     console.log 'print=', Clic.opts
   .command 'sub', 'sub', sub

@@ -1,6 +1,7 @@
 path = require 'path'
-debug = require('debug') 'command'
+debug = require('debug') 'clic'
 R = require 'ramda'
+changeCase = require 'change-case'
 
 # indent = require 'indent-string'
 
@@ -95,6 +96,7 @@ getFlagInfo = (flag_fmt, opt)->
   name = opt?.name or R.head aliases
   isShort = R.o R.equals(2), R.length
   [shorts, longs] = R.partition isShort, aliases
+  name = changeCase.constantCase name
   return { name, aliases, shorts, longs }
 
 maxOfProp = (prop_name, data)->
@@ -240,6 +242,7 @@ class CliCommand
     @action_fn = fn
     return this
   actionAlt: (flag, fn)->
+    flag = changeCase.constantCase flag
     @alt_actions[flag] = {fn}
     return this
   command: (args... )->
