@@ -266,7 +266,8 @@ class CliCommand
     @extractors.push (ctx)->
       [alias, vals] = ctx.opt_info.getValues aliases
       unless alias?
-        ctx.input[name] = []
+        ctx.input[name] = opt.default or []
+        return
       else
         ctx.input[name] = vals
     return this
@@ -277,7 +278,9 @@ class CliCommand
     @setHelpFlag flag_fmt, desc
     @extractors.push (ctx)->
       [alias, vals] = ctx.opt_info.getValues aliases
-      return ctx unless alias?
+      unless alias?
+        ctx.input[name] = opt.default
+        return
       if vals.length isnt 1
         throw new Error 'require only single string; ' + withDash alias
       ctx.input[name] = vals[0]
@@ -289,7 +292,10 @@ class CliCommand
     @setHelpFlag flag_fmt, desc
     @extractors.push (ctx)->
       [alias, vals] = ctx.opt_info.getValues aliases
-      return ctx unless alias?
+      # return ctx unless alias?
+      unless alias?
+        ctx.input[name] = opt.default
+        return
       if vals.length isnt 1
         throw new Error 'require only single number; ' + withDash alias
       num =  Number vals[0]
@@ -304,7 +310,10 @@ class CliCommand
     @setHelpFlag flag_fmt, desc
     @extractors.push (ctx)->
       [alias, vals] = ctx.opt_info.getValues aliases
-      return ctx unless alias?
+      # return ctx unless alias?
+      unless alias?
+        ctx.input[name] = opt.default
+        return
       ctx.input[name] = opt.convert vals, alias
     return this
 

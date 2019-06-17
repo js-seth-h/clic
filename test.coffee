@@ -18,7 +18,7 @@ self = Clic.command()
   .description "Cli-Command Example Propgram "
   # .array '--mod str ... str', 'mods'
   .string '--str, -s <str>', 'string'
-  .string '--str2 <str>', 'string'
+  .string '--str2 <str>', 'string', default: 'test'
   .number '--count, -c <count>', "set count."
   .number '--count2 <count>', "set count."
   # .number '--long, -l <count>', """long description of flag. this is show examples.
