@@ -310,7 +310,7 @@ class CliCommand
     @extractors.push (acc, opt_info)->
       [alias, vals] = opt_info.getValues aliases
       unless alias?
-        acc[name] = acc[name] or opt.default or []
+        acc[name] = opt.default or [] if R.isNil acc[name]
         return
       else
         acc[name] = vals
@@ -323,7 +323,7 @@ class CliCommand
     @extractors.push (acc, opt_info)->
       [alias, vals] = opt_info.getValues aliases
       unless alias?
-        acc[name] = acc[name] or opt.default
+        acc[name] = opt.default if R.isNil acc[name]
         return
       if vals.length isnt 1
         throw new Error 'require only single string; ' + withDash alias
@@ -338,7 +338,7 @@ class CliCommand
       [alias, vals] = opt_info.getValues aliases
       # return ctx unless alias?
       unless alias?
-        acc[name] = acc[name] or opt.default
+        acc[name] = opt.default if R.isNil acc[name]
         return
       if vals.length isnt 1
         throw new Error 'require only single number; ' + withDash alias
@@ -356,7 +356,7 @@ class CliCommand
       [alias, vals] = opt_info.getValues aliases
       # return ctx unless alias?
       unless alias?
-        acc[name] = acc[name] or opt.default
+        acc[name] = opt.default if R.isNil acc[name]
         return
       acc[name] = opt.convert vals, alias
     return this
@@ -369,7 +369,7 @@ class CliCommand
     @extractors.push (acc, opt_info)->
       [alias, vals] = opt_info.getValues aliases
       unless alias?
-        acc[name] = acc[name] or opt.default
+        acc[name] = opt.default if R.isNil acc[name]
         return
       if vals.length is 0
         acc[name] = true
