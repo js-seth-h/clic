@@ -194,18 +194,22 @@ class CliCommand
     return this
   getFileOpts: ()->
     return [] unless @opt_filepath
-    opts_contents = fs.readFileSync @opt_filepath, 'utf8'
-    opts_lines = R.reject RA.isNilOrEmpty, R.split /\r?\n/, opts_contents
-    asFlag = (line)->
-      # re = /(\"([^\"]+)\"|([^\s\"]+)\s+)\s*/
-      # console.log 'exec', re.exec(line)
-      toks = line.match(/\"([^\"]+)\"|([^\s\"]+)/g)
-      removeQuotes = (word)->
-        return word[1...-1] if word[0] is '"'
-        return word
-      R.map removeQuotes, toks
-      # line.match(/(\"[^\"]+\"|[^\\s\"]+)/)
-    file_opts = R.flatten R.map asFlag, opts_lines
+    try
+      opts_contents = fs.readFileSync @opt_filepath, 'utf8'
+      opts_lines = R.reject RA.isNilOrEmpty, R.split /\r?\n/, opts_contents
+      asFlag = (line)->
+        # re = /(\"([^\"]+)\"|([^\s\"]+)\s+)\s*/
+        # console.log 'exec', re.exec(line)
+        toks = line.match(/\"([^\"]+)\"|([^\s\"]+)/g)
+        removeQuotes = (word)->
+          return word[1...-1] if word[0] is '"'
+          return word
+        R.map removeQuotes, toks
+        # line.match(/(\"[^\"]+\"|[^\\s\"]+)/)
+      file_opts = R.flatten R.map asFlag, opts_lines
+    catch error
+      return []
+
 
   extractOpts: (context)->
     unless context?
