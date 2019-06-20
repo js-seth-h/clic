@@ -57,6 +57,11 @@ self = Clic.command()
 
 # console.log 'opts=', self.extractOpts()
 
-self.execute()
+if require.main is module
+  self.execute()
+
+module.exports = {
+  self
+}
 # console.log 'Clic.opts =', Clic.opts
 # console.log 'Clic.raw =', Clic.raw

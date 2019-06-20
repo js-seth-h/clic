@@ -61,7 +61,11 @@ class OptInfo
     return [null, null]
 
 
+GENESIS_CONTEXT = null
+# NOTE opts값은 변하지 않으니 genesis를 여러번 불러서 처리해도 된다.
 genesisContext = ()->
+  return GENESIS_CONTEXT if GENESIS_CONTEXT?
+
   debug 'process.argv', process.argv
   # debug 'requre.main', require.main
   fn = require.main.filename
@@ -80,15 +84,15 @@ genesisContext = ()->
   # [opts, commands] = R.partition R.startsWith('-'), opts
 
   cmd1 = path.basename fn#, path.extname fn
-  context = {
+  GENESIS_CONTEXT = {
     host : [cmd1]
     # opt_info: parser
     commands
     opts
   }
 
-  debug 'genesisContext', context
-  return context
+  debug 'genesisContext', GENESIS_CONTEXT
+  return GENESIS_CONTEXT
 
 
 getFlagInfo = (flag_fmt, opt)->
@@ -417,16 +421,21 @@ Object.defineProperties exports,
 
 Object.assign exports,
   command: ()-> new CliCommand()
-  restoreFromEnv: ->
-    if process.env.clic_opt_str?
-      setCliOpts JSON.parse process.env.clic_opt_str
-  runSh: (cmd, opt)->
+  # restoreFromEnv: ->
+  #   if process.env.clic_opt_str?
+  #     setCliOpts JSON.parse process.env.clic_opt_str
+  #     return true
+  #   return false
+  runSh: (cmd)->
     # console.log 'run', cmd
     options =
       stdio: 'inherit'
-    if opt.pass_opt is 'env'
-      options.env = Object.assign process.env,
-        clic_opt_str: JSON.stringify getCliOpts()
+    # if opt.pass_opt is 'env'
+    #   options.env = Object.assign process.env,
+    #     clic_opt_str: JSON.stringify getCliOpts()
+    gctx = genesisContext()
+    opt_str = R.join ' ', gctx.opts
+    cmd = cmd + " " + opt_str
     if process.platform is "win32"
       command = "cmd.exe"
       args = ["/s", "/c", cmd]
