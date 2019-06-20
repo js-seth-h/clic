@@ -253,6 +253,7 @@ class CliCommand
     # for own flag, act of @commands
     cmd_name = R.head context.commands
     if cmd_name? and @commands[cmd_name]?
+      cli_opts._.shift()
       return @commands[cmd_name].fn.apply this, []
 
     if @action_fn?
@@ -434,7 +435,7 @@ Object.assign exports,
     #   options.env = Object.assign process.env,
     #     clic_opt_str: JSON.stringify getCliOpts()
     gctx = genesisContext()
-    opt_str = R.join ' ', gctx.opts
+    opt_str = R.join ' ', R.concat getCliOpts()._, gctx.opts
     cmd = cmd + " " + opt_str
     if process.platform is "win32"
       command = "cmd.exe"
