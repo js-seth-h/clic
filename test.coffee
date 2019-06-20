@@ -9,10 +9,11 @@ sub = Clic.command()
   .version '9.9.9', default: true
   .boolean '-z'
   .actionAlt 'z', ()->
-    console.log 'print=', Clic.opts
+    console.log 'sub -z print=', Clic.opts
 
 self = Clic.command()
   # .usage "groups... -g greps..."
+  .optsFile 'clic.opts'
   .usage ->
     console.log "  #{@cli_cmd} groups... -g greps.."
   .description "Cli-Command Example Propgram "

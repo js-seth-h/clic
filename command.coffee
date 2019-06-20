@@ -1,8 +1,9 @@
 path = require 'path'
 debug = require('debug') 'clic'
 R = require 'ramda'
+RA = require 'ramda-adjunct'
 changeCase = require 'change-case'
-
+fs = require 'fs'
 # indent = require 'indent-string'
 
 CLI_OPTS = {}
@@ -21,8 +22,21 @@ withDash = (str)->
   else
     return "--" + str
 class OptInfo
-  constructor: ()->
+  constructor: (opts)->
     @data = {}
+    for tok in opts
+      if R.startsWith '--no-', tok
+        @setKey tok[5...]
+        @pushValue false
+      if R.startsWith '--', tok
+        @setKey tok[2...]
+      else if R.startsWith '-', tok
+        for ch in tok[1...]
+          @setKey ch
+      else
+        @pushValue tok
+    @end()
+
   setKey: (key)->
     @endOpt()
     @last_key = key
@@ -46,6 +60,7 @@ class OptInfo
       return [alias, @data[alias]]
     return [null, null]
 
+
 genesisContext = ()->
   debug 'process.argv', process.argv
   # debug 'requre.main', require.main
@@ -62,27 +77,16 @@ genesisContext = ()->
   RAW_CMDS = commands
   RAW_OPTS = opts
 
-  parser = new OptInfo()
-  for tok in opts
-    if R.startsWith '--no-', tok
-      parser.setKey tok[5...]
-      parser.pushValue false
-    if R.startsWith '--', tok
-      parser.setKey tok[2...]
-    else if R.startsWith '-', tok
-      for ch in tok[1...]
-        parser.setKey ch
-    else
-      parser.pushValue tok
-  parser.end()
   # [opts, commands] = R.partition R.startsWith('-'), opts
 
   cmd1 = path.basename fn#, path.extname fn
   context = {
     host : [cmd1]
-    opt_info: parser
+    # opt_info: parser
     commands
+    opts
   }
+
   debug 'genesisContext', context
   return context
 
@@ -184,17 +188,44 @@ class CliCommand
   setHelpFlag: (flag_fmt, desc)->
     @help_data.options.push {flag_fmt, desc}
     return this
+  getFileOpts: ()->
+    return [] unless @opt_filepath
+    opts_contents = fs.readFileSync @opt_filepath, 'utf8'
+    opts_lines = R.reject RA.isNilOrEmpty, R.split /\r?\n/, opts_contents
+    asFlag = (line)->
+      # re = /(\"([^\"]+)\"|([^\s\"]+)\s+)\s*/
+      # console.log 'exec', re.exec(line)
+      toks = line.match(/\"([^\"]+)\"|([^\s\"]+)/g)
+      removeQuotes = (word)->
+        return word[1...-1] if word[0] is '"'
+        return word
+      R.map removeQuotes, toks
+      # line.match(/(\"[^\"]+\"|[^\\s\"]+)/)
+    file_opts = R.flatten R.map asFlag, opts_lines
+
   extractOpts: (context)->
     unless context?
       context = genesisContext()
 
-    context.input = {}
+    file_opts = @getFileOpts()
+    # console.log file_opts
+    # opts_contents = R.split /(\"[^\"]+\"|[^\\s\"]+)/g, opts_contents
+    # console.log opts_contents
+    # process.exit()
+    acc = {}
     for extract_fn in @extractors
-      extract_fn context
+      extract_fn acc, new OptInfo file_opts
+    for extract_fn in @extractors
+      extract_fn acc, new OptInfo context.opts
+
+
+    # context.input = {}
+    # for extract_fn in @extractors
+    #   extract_fn context
       # debug 'context in progress', context
     # cli_opts = @parseContext context
     # context._ = context.commands
-    setCliOpts R.mergeRight context.input,
+    setCliOpts R.mergeRight acc,
       _: context.commands
   execute: (context, @parent = null)->
     unless context?
@@ -261,63 +292,64 @@ class CliCommand
   #   # @help_data.commands.push {command: str, desc}
   #   @setHelpCommand str, desc
   #   return this
+  optsFile: (@opt_filepath)-> return this
   array: (flag_fmt, desc = '', opt = {})->
     {name, aliases, shorts, longs} = getFlagInfo flag_fmt, opt
     debug 'string', name, shorts, longs
     # @help_data.options.push {flag_fmt, desc}
     @setHelpFlag flag_fmt, desc
-    @extractors.push (ctx)->
-      [alias, vals] = ctx.opt_info.getValues aliases
+    @extractors.push (acc, opt_info)->
+      [alias, vals] = opt_info.getValues aliases
       unless alias?
-        ctx.input[name] = opt.default or []
+        acc[name] = acc[name] or opt.default or []
         return
       else
-        ctx.input[name] = vals
+        acc[name] = vals
     return this
   string: (flag_fmt, desc = '', opt = {})->
     {name, aliases, shorts, longs} = getFlagInfo flag_fmt, opt
     debug 'string', name, shorts, longs
     # @help_data.options.push {flag_fmt, desc}
     @setHelpFlag flag_fmt, desc
-    @extractors.push (ctx)->
-      [alias, vals] = ctx.opt_info.getValues aliases
+    @extractors.push (acc, opt_info)->
+      [alias, vals] = opt_info.getValues aliases
       unless alias?
-        ctx.input[name] = opt.default
+        acc[name] = acc[name] or opt.default
         return
       if vals.length isnt 1
         throw new Error 'require only single string; ' + withDash alias
-      ctx.input[name] = vals[0]
+      acc[name] = vals[0]
     return this
   number: (flag_fmt, desc = '', opt = {})->
     {name, aliases, shorts, longs} = getFlagInfo flag_fmt, opt
     debug 'number', name, shorts, longs
     # @help_data.options.push {flag_fmt, desc}
     @setHelpFlag flag_fmt, desc
-    @extractors.push (ctx)->
-      [alias, vals] = ctx.opt_info.getValues aliases
+    @extractors.push (acc, opt_info)->
+      [alias, vals] = opt_info.getValues aliases
       # return ctx unless alias?
       unless alias?
-        ctx.input[name] = opt.default
+        acc[name] = acc[name] or opt.default
         return
       if vals.length isnt 1
         throw new Error 'require only single number; ' + withDash alias
       num =  Number vals[0]
       if Number.isNaN num
         throw new Error 'can not parse number; ' + vals[0]
-      ctx.input[name] = num
+      acc[name] = num
     return this
   custom: (flag_fmt, desc = '', opt = {})->
     {name, aliases, shorts, longs} = getFlagInfo flag_fmt, opt
     debug 'string', name, shorts, longs
     # @help_data.options.push {flag_fmt, desc}
     @setHelpFlag flag_fmt, desc
-    @extractors.push (ctx)->
-      [alias, vals] = ctx.opt_info.getValues aliases
+    @extractors.push (acc, opt_info)->
+      [alias, vals] = opt_info.getValues aliases
       # return ctx unless alias?
       unless alias?
-        ctx.input[name] = opt.default
+        acc[name] = acc[name] or opt.default
         return
-      ctx.input[name] = opt.convert vals, alias
+      acc[name] = opt.convert vals, alias
     return this
 
   boolean: (flag_fmt, desc = '', opt = {})->
@@ -325,16 +357,16 @@ class CliCommand
     debug 'boolean', name, shorts, longs
     # @help_data.options.push {flag_fmt, desc}
     @setHelpFlag flag_fmt, desc
-    @extractors.push (ctx)->
-      [alias, vals] = ctx.opt_info.getValues aliases
+    @extractors.push (acc, opt_info)->
+      [alias, vals] = opt_info.getValues aliases
       unless alias?
-        ctx.input[name] = opt.default
+        acc[name] = acc[name] or opt.default
         return
       if vals.length is 0
-        ctx.input[name] = true
+        acc[name] = true
         return
       if vals[0] is false
-        ctx.input[name] = false
+        acc[name] = false
         return
       debug 'boolean', alias, vals
       throw new Error 'require only on/off; ' + withDash alias
