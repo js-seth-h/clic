@@ -51,7 +51,7 @@ self = Clic.command()
   #   a = Clic.opts.not_exist
   # .subCommand 'version', "print version", (new Clic()).action ()-> console.log 'version: 1.0.0'
   .command 'shell', ->
-    Clic.runSh "coffee test2.coffee", pass_opt: 'env'
+    Clic.spawnShell "coffee test2.coffee", pass_opt: 'env'
   .help default: true, command: false
   .version '1.0.0', command: true
 

@@ -3,6 +3,7 @@ debug = require('debug') 'clic'
 R = require 'ramda'
 RA = require 'ramda-adjunct'
 changeCase = require 'change-case'
+child_process = require 'child_process'
 fs = require 'fs'
 # indent = require 'indent-string'
 
@@ -431,23 +432,25 @@ Object.assign exports,
   #     setCliOpts JSON.parse process.env.clic_opt_str
   #     return true
   #   return false
-  runSh: (cmd)->
+  spawnShell: (cmd)->
     # console.log 'run', cmd
     options =
       stdio: 'inherit'
+      shell: true
     # if opt.pass_opt is 'env'
     #   options.env = Object.assign process.env,
     #     clic_opt_str: JSON.stringify getCliOpts()
     gctx = genesisContext()
-    opt_str = R.join ' ', R.concat getCliOpts()._, gctx.opts
-    cmd = cmd + " " + opt_str
-    if process.platform is "win32"
-      command = "cmd.exe"
-      args = ["/s", "/c", cmd]
-      options.windowsVerbatimArguments = true
-    else
-      command = "/bin/sh"
-      args = [ "-c", cmd ]
-    child_process = require 'child_process'
+    toks = [cmd, getCliOpts()._..., gctx.opts... ]
+    cmd = R.join ' ', toks
+    # opt_str = R.join ' ', R.concat getCliOpts()._, gctx.opts
+    # cmd = cmd + " " + opt_str
+    # if process.platform is "win32"
+    #   command = "cmd.exe"
+    #   args = ["/s", "/c", cmd]
+    #   options.windowsVerbatimArguments = true
+    # else
+    #   command = "/bin/sh"
+    #   args = [ "-c", cmd ]
     # console.log 'child_process.spawn', command, args, options
-    proc = child_process.spawn command, args, options
+    proc = child_process.spawn cmd, [], options
